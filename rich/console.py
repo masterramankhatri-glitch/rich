@@ -1,4 +1,5 @@
 import os
+import string
 import sys
 import threading
 from abc import ABC, abstractmethod
@@ -2214,6 +2215,74 @@ class Console:
             if clear:
                 del self._record_buffer[:]
         return text
+
+    def export_markdown(
+        self, *, clear: bool = True, escape_special_chars: bool = False
+    ) -> str:
+        """Generate Markdown from console contents (requires record=True argument in constructor).
+
+        Args:
+            clear (bool, optional): Clear record buffer after exporting. Defaults to ``True``.
+            escape_special_chars (bool, optional): Escape Markdown punctuation in text.
+                Defaults to ``False``.
+
+        Returns:
+            str: String containing console contents as Markdown.
+        """
+        if not self.record:
+            raise ValueError(
+                "Cannot export markdown; Console must be created with record=True"
+            )
+
+        fragments: list[str] = []
+        punctuation = string.punctuation
+        with self._record_buffer_lock:
+            for segment in Segment.filter_control(
+                Segment.simplify(self._record_buffer)
+            ):
+                if not segment.text:
+                    continue
+                style = segment.style
+                for line in segment.text.splitlines(keepends=True):
+                    if line.endswith("\r\n"):
+                        text, line_ending = line[:-2], "\r\n"
+                    elif line.endswith(("\r", "\n")):
+                        text, line_ending = line[:-1], line[-1]
+                    else:
+                        text, line_ending = line, ""
+
+                    leading = len(text) - len(text.lstrip())
+                    trailing = len(text.rstrip())
+                    if leading >= trailing:
+                        prefix, content, suffix = text, "", ""
+                    else:
+                        prefix, content, suffix = (
+                            text[:leading],
+                            text[leading:trailing],
+                            text[trailing:],
+                        )
+                    if escape_special_chars:
+                        content = "".join(
+                            f"\\{character}" if character in punctuation else character
+                            for character in content
+                        )
+
+                    if style and content:
+                        if style.bold and style.italic:
+                            content = f"***{content}***"
+                        elif style.bold:
+                            content = f"**{content}**"
+                        elif style.italic:
+                            content = f"*{content}*"
+                        if style.strike:
+                            content = f"~~{content}~~"
+                        if style.link:
+                            content = f"[{content}]({style.link})"
+                    fragments.append(f"{prefix}{content}{suffix}{line_ending}")
+
+            if clear:
+                del self._record_buffer[:]
+        return "".join(fragments)
 
     def save_text(
         self,

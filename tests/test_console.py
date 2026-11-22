@@ -515,6 +515,48 @@ def test_export_text() -> None:
     assert text == expected
 
 
+def test_export_markdown() -> None:
+    console = Console(record=True, width=100)
+    console.print(
+        "[bold]bold[/] [italic]italic[/] [strike]strike[/] "
+        "[bold italic]both[/] [link=https://example.org]link[/]"
+    )
+    assert (
+        console.export_markdown()
+        == "**bold** *italic* ~~strike~~ ***both*** [link](https://example.org)\n"
+    )
+
+
+def test_export_markdown_record_required() -> None:
+    console = Console(record=False)
+    with pytest.raises(
+        ValueError,
+        match="Cannot export markdown; Console must be created with record=True",
+    ):
+        console.export_markdown()
+
+
+def test_export_markdown_clear() -> None:
+    console = Console(record=True, width=100)
+    console.print("[bold]foo[/]")
+    assert console.export_markdown(clear=False) == "**foo**\n"
+    assert console.export_markdown(clear=False) == "**foo**\n"
+    assert console.export_markdown(clear=True) == "**foo**\n"
+    assert console.export_markdown() == ""
+
+
+def test_export_markdown_escape_special_chars() -> None:
+    console = Console(record=True, width=100)
+    console.print("[bold]a*b_[/]")
+    assert console.export_markdown(escape_special_chars=True) == r"**a\*b\_**" + "\n"
+
+
+def test_export_markdown_lines_and_spaces() -> None:
+    console = Console(record=True, width=100)
+    console.print("[bold] foo \nbar [/]")
+    assert console.export_markdown() == " **foo** \n**bar** \n"
+
+
 def test_export_html() -> None:
     console = Console(record=True, width=100)
     console.print("[b]foo <script> 'test' [link=https://example.org]Click[/link]")
